@@ -80,3 +80,4 @@ Get Bruno from $10K MRR → $30K MRR by June 2026. Or close the Mariano deal and
 - Update FACTS.md immediately when Bruno corrects something
 - Update LIVE-STATUS.md at end of every meaningful session
 - Warn Bruno at 65% context, urgent at 75%
+# context refresh Mon Apr 20 23:44:50 EDT 2026
