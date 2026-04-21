@@ -88,5 +88,7 @@ export async function POST(req: Request) {
     maxTokens: 2048,
   });
 
-  return result.toDataStreamResponse();
+  // Plain text stream — frontend manages per-channel state and parses
+  // chunks directly, without the AI SDK data-stream framing.
+  return result.toTextStreamResponse();
 }

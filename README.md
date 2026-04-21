@@ -1,12 +1,36 @@
 # Boss Stack Chat
 
-Direct line to **Boss** — Bruno's strategic AI co-founder at 2FLY Digital Marketing. No middleware. Just a clean streaming chat UI talking straight to the Anthropic API.
+Direct line to **Boss** — Bruno's strategic AI co-founder at 2FLY Digital Marketing. No middleware. Discord-style workspace talking straight to the Anthropic API.
 
 - **Frontend:** Next.js 14 (App Router) + Tailwind CSS
-- **Streaming:** Vercel AI SDK (`ai` + `@ai-sdk/anthropic`)
+- **Layout:** Discord-style — left sidebar with dynamic categories and channels, main chat pane
+- **Streaming:** Vercel AI SDK (`ai` + `@ai-sdk/anthropic`) via plain text stream
 - **Model:** `claude-sonnet-4-6`
 - **Auth:** single password, httpOnly cookie, 7-day session
 - **Memory:** `context/QUICK-CONTEXT.md` + `context/FACTS.md` loaded into Boss's system prompt on startup
+- **State:** every channel's history lives in `localStorage` — no database
+
+## Channels at a glance
+
+- Each channel is an isolated conversation with Boss (its own history, its own `slice(-20)` context window).
+- Switching channels loads that channel's history; new channels start blank.
+- Mid-stream channel switch keeps the old stream running in the background; the channel lights up bold (unread) when Boss finishes.
+- Default layout on first load:
+  - **COMMAND CENTER** — `morning-brief`, `daily-priorities`
+  - **AGENCY** — `client-alerts`, `team-ops`
+  - **PROJECTS** — `offbounds`, `boss-stack`
+- All CRUD lives in the sidebar: `+` next to a category adds a channel, `+` in the header adds a category. Double-click a name to rename, right-click (or the × icon) to delete.
+
+## localStorage keys
+
+| key | value |
+| --- | --- |
+| `boss_channels` | `{ categories: Category[], channels: Channel[] }` |
+| `boss_active_channel` | channel id of the last active channel |
+| `boss_unread` | array of channel ids with unread replies |
+| `boss_chat_{channelId}` | `Message[]` for that channel |
+
+> The per-channel key uses the channel **id** (not name) so renames don't orphan history.
 
 ---
 
@@ -28,7 +52,7 @@ cp .env.example .env.local
 Then edit `.env.local`:
 
 ```
-ANTHROPIC_API_KEY=your-anthropic-key-here
+ANTHROPIC_API_KEY=sk-ant-...
 BOSS_PASSWORD=pick-something-strong
 ```
 
@@ -109,7 +133,19 @@ To log out, hit `DELETE /api/login` (wire a button to it if you want one in the 
 
 ## How streaming works
 
-`/api/chat` receives the conversation, trims it to the last 20 messages, prepends Boss's system prompt + both memory files, and streams the response via `streamText(...).toDataStreamResponse()`. The frontend uses `useChat` from `ai/react`, so tokens render as they arrive.
+`/api/chat` receives the conversation, trims it to the last 20 messages, prepends Boss's system prompt + both memory files, and streams the response via `streamText(...).toTextStreamResponse()` — a plain text stream.
+
+The frontend manages per-channel state itself (rather than `useChat`), so a stream that started in channel A keeps writing to channel A's history even if you switch to channel B mid-reply. When the stream closes, A gets a bold unread indicator until you visit it.
+
+## Keyboard & mouse
+
+- `Enter` — send, `Shift+Enter` — newline
+- Click channel — switch
+- Double-click channel name — inline rename
+- Double-click category name — inline rename
+- Right-click channel — delete (confirm prompt)
+- Hover channel — reveal ✎ / × icons (desktop)
+- `☰` in the chat header — toggle sidebar on mobile
 
 ## Changing the model
 
@@ -120,13 +156,6 @@ model: anthropic("claude-sonnet-4-6"),
 ```
 
 Swap the string for any current Anthropic model id you have access to.
-
-## Keyboard shortcuts
-
-- `Enter` — send
-- `Shift+Enter` — newline
-- The **Stop** button cancels a streaming reply mid-flight.
-- The **Retry** button re-runs the last turn.
 
 ## Security notes
 
