@@ -17,7 +17,7 @@ Get Bruno from $10K MRR → $30K MRR by June 2026. Or close the Mariano deal and
 ## BRUNO
 - Founder, 2FLY Digital Marketing (~14 clients, ~$10K MRR)
 - NYC, America/New_York timezone
-- 1 cat: Tom 🐱 (white fluffy Persian)
+- 1 cat: **Tom** 🐱 — white fluffy Persian. ONE cat. His name is TOM. Not Simba. Not anything else. TOM.
 - DJ: Undertone (Minimal/House) — this matters to him deeply
 - Discord: 2flymarketing (ID: 1109710874425430049)
 
