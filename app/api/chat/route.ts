@@ -53,14 +53,10 @@ function loadContextOnce(): string {
 }
 
 // ---------- Route ----------
-export async function POST(req: Request) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return new Response(
-      JSON.stringify({ error: "ANTHROPIC_API_KEY is not set" }),
-      { status: 500, headers: { "content-type": "application/json" } }
-    );
-  }
+const RAILWAY_URL = "https://webhook-server-production-cc52.up.railway.app/api/ask";
+const RAILWAY_TIMEOUT_MS = 15_000;
 
+export async function POST(req: Request) {
   let body: { messages?: CoreMessage[] };
   try {
     body = await req.json();
@@ -72,8 +68,67 @@ export async function POST(req: Request) {
   }
 
   const allMessages = Array.isArray(body.messages) ? body.messages : [];
-  // Keep the last 20 messages for context window hygiene
+  // Keep the last 20 messages for the Anthropic fallback's context window hygiene
   const recentMessages = allMessages.slice(-20);
+
+  // Pull the latest user turn for Railway (which only wants a single message)
+  const lastUser = [...recentMessages].reverse().find((m) => m.role === "user");
+  const lastUserText =
+    typeof lastUser?.content === "string"
+      ? lastUser.content
+      : Array.isArray(lastUser?.content)
+        ? lastUser.content
+            .filter((p: any) => p?.type === "text")
+            .map((p: any) => p.text)
+            .join("\n")
+        : "";
+
+  // ---- Primary path: Railway (cheap, memory-cached) ----
+  if (lastUserText) {
+    try {
+      const railwayRes = await fetch(RAILWAY_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message: lastUserText, user: "bruno" }),
+        signal: AbortSignal.timeout(RAILWAY_TIMEOUT_MS),
+      });
+
+      if (railwayRes.ok) {
+        const data = (await railwayRes.json()) as { response?: string };
+        const text = data?.response ?? "";
+        if (text) {
+          // Wrap the single JSON reply in a plain-text stream so the
+          // frontend's existing stream reader keeps working unchanged.
+          const stream = new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode(text));
+              controller.close();
+            },
+          });
+          return new Response(stream, {
+            headers: {
+              "content-type": "text/plain; charset=utf-8",
+              "cache-control": "no-cache",
+              "x-boss-source": "railway",
+            },
+          });
+        }
+      }
+      // Non-OK status or empty body → fall through to Anthropic
+    } catch {
+      // Timeout / network error → fall through to Anthropic
+    }
+  }
+
+  // ---- Fallback: direct Anthropic ----
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return new Response(
+      JSON.stringify({
+        error: "Railway unavailable and ANTHROPIC_API_KEY is not set",
+      }),
+      { status: 502, headers: { "content-type": "application/json" } }
+    );
+  }
 
   const context = loadContextOnce();
   const system = context
@@ -88,7 +143,5 @@ export async function POST(req: Request) {
     maxTokens: 2048,
   });
 
-  // Plain text stream — frontend manages per-channel state and parses
-  // chunks directly, without the AI SDK data-stream framing.
   return result.toTextStreamResponse();
 }
