@@ -54,7 +54,7 @@ function loadContextOnce(): string {
 
 // ---------- Route ----------
 const RAILWAY_URL = "https://webhook-server-production-cc52.up.railway.app/api/ask";
-const RAILWAY_TIMEOUT_MS = 28_000; // 28s — survives Railway cold starts (max Vercel hobby fn is 60s)
+const RAILWAY_TIMEOUT_MS = 55_000; // 55s — survives Railway cold starts (max Vercel hobby fn is 60s)
 
 export async function POST(req: Request) {
   let body: { messages?: CoreMessage[] };
